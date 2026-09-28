@@ -1,0 +1,28 @@
+services:
+  mongo:
+    image: mongo:7-jammy
+    container_name: mandi-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - /mnt/va-main/data/mongodb:/data/db
+    networks:
+      - agri-net
+
+  scraper:
+    build: .
+    container_name: mandi-scraper
+    restart: "no"
+    depends_on:
+      - mongo
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/
+      - MONGODB_DB=mandi_scraper
+      - DATAGOV_API_KEY=${DATAGOV_API_KEY:-}
+    networks:
+      - agri-net
+
+networks:
+  agri-net:
+    driver: bridge
