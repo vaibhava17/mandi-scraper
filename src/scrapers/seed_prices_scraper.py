@@ -138,7 +138,8 @@ class SeedPricesScraper:
                 **b,
                 "currency": "INR",
                 "scraped_date": today_str,
-                "source": "commercial_seed_index",
+                "source": "reference_benchmark",
+                "is_reference": True,
             })
         return records
 
@@ -204,10 +205,100 @@ class SeedPricesScraper:
         logger.info(f"TrustBasket scraped: {len(records)} seed items.")
         return records
 
+    def scrape_agribegri_seeds(self, limit: int = 40) -> List[Dict[str, Any]]:
+        """Scrape live commercial hybrid vegetable and flower seeds from AgriBegri via sitemap + JSON-LD."""
+        records = []
+        today_str = date.today().isoformat()
+        sitemap_url = "https://agribegri.com/products-sitemap.xml"
+
+        try:
+            r = self.session.get(sitemap_url, timeout=20)
+            if r.status_code != 200:
+                logger.warning(f"Failed to fetch AgriBegri sitemap: status {r.status_code}")
+                return records
+
+            # Extract seed product URLs
+            import re
+            import bs4
+            urls = re.findall(r"<loc>(https://agribegri\.com/products/[^<]+seeds[^<]*\.php)</loc>", r.text)
+            logger.info(f"Found {len(urls)} seed product URLs in AgriBegri sitemap.")
+
+            # Filter for commercial vegetable and field crops
+            priority_crops = ["chilli", "tomato", "okra", "cauliflower", "cabbage", "cucumber", "mustard", "peas", "gourd", "marigold"]
+            filtered_urls = []
+            for u in urls:
+                if any(c in u.lower() for c in priority_crops):
+                    filtered_urls.append(u)
+                if len(filtered_urls) >= limit:
+                    break
+
+            for u in filtered_urls:
+                try:
+                    resp = self.session.get(u, timeout=15)
+                    if resp.status_code != 200:
+                        continue
+                    soup = bs4.BeautifulSoup(resp.text, "html.parser")
+                    for script in soup.find_all("script", type="application/ld+json"):
+                        try:
+                            data = json.loads(script.string or "")
+                            if data.get("@type") == "Product":
+                                title = data.get("name", "").strip()
+                                brand = data.get("brand", {}).get("name", "AgriBegri")
+                                t_lower = title.lower()
+
+                                # Detect crop category
+                                crop = "Vegetable Seeds"
+                                for c in priority_crops:
+                                    if c in t_lower:
+                                        crop = c.capitalize()
+                                        break
+
+                                seed_type = "F1 Hybrid" if "hybrid" in t_lower or "f1" in t_lower else "Commercial Variety"
+
+                                offers = data.get("offers", [])
+                                if isinstance(offers, dict):
+                                    offers = [offers]
+
+                                for o in offers:
+                                    try:
+                                        price = float(o.get("price") or 0)
+                                        if price <= 0:
+                                            continue
+                                        sku = o.get("sku") or "Standard Pack"
+                                        records.append({
+                                            "title": title,
+                                            "crop": crop,
+                                            "variety": title.split("-")[0].strip(),
+                                            "brand": brand,
+                                            "seed_type": seed_type,
+                                            "pack_size": sku,
+                                            "price": price,
+                                            "mrp": price,
+                                            "currency": "INR",
+                                            "vendor": "AgriBegri",
+                                            "product_url": u,
+                                            "scraped_date": today_str,
+                                            "source": "agribegri_live",
+                                            "is_reference": False,
+                                        })
+                                    except (ValueError, TypeError):
+                                        continue
+                        except Exception:
+                            continue
+                except Exception as e:
+                    logger.debug(f"Error scraping AgriBegri product {u}: {e}")
+
+            logger.info(f"AgriBegri scraped: {len(records)} live commercial seed items.")
+        except Exception as e:
+            logger.error(f"Error in AgriBegri seed scraper: {e}")
+
+        return records
+
     def scrape_all(self) -> List[Dict[str, Any]]:
         """Run all seed price scrapers."""
         all_seeds = []
-        all_seeds.extend(self.scrape_commercial_benchmarks())
+        all_seeds.extend(self.scrape_agribegri_seeds())
         all_seeds.extend(self.scrape_trustbasket_seeds())
+        all_seeds.extend(self.scrape_commercial_benchmarks())
         logger.info(f"Total seed records gathered: {len(all_seeds)}")
         return all_seeds

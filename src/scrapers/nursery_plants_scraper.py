@@ -127,7 +127,8 @@ class NurseryPlantsScraper:
                 **item,
                 "scraped_date": today_str,
                 "currency": "INR",
-                "source": "horticulture_mandi_index",
+                "source": "reference_benchmark",
+                "is_reference": True,
             })
         return records
 
