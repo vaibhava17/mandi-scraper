@@ -113,7 +113,7 @@ def generate_daily_summary(
     if "Tomato" in mandi_highlights:
         lines.append(f"  - Harvest Market Realization: ₹{mandi_highlights['Tomato']['avg_kg']}/kg modal average")
     lines.append("─────────────────────────────")
-    lines.append("✅ _All records indexed in MongoDB collection `mandi_scraper`._")
+    lines.append("✅ _All records saved to the price database._")
 
     text_summary = "\n".join(lines)
 
