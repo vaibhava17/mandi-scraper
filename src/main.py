@@ -19,7 +19,7 @@ import argparse
 from datetime import datetime, timezone
 import requests
 
-from src.db.mongo import AgriDatabase
+from src.db import get_database
 from src.scrapers.mandi_scraper import MandiScraper
 from src.scrapers.nursery_plants_scraper import NurseryPlantsScraper
 from src.scrapers.seed_prices_scraper import SeedPricesScraper
@@ -65,10 +65,10 @@ def main():
     db = None
     if not args.dry_run:
         try:
-            db = AgriDatabase()
-            logger.info("Connected to MongoDB successfully.")
+            db = get_database()
+            logger.info(f"Connected to {type(db).__name__} successfully.")
         except Exception as e:
-            logger.error(f"MongoDB connection failed: {e}. Exiting.")
+            logger.error(f"Database connection failed: {e}. Exiting.")
             sys.exit(1)
 
     # 2. Run Mandi Scraper
@@ -91,7 +91,7 @@ def main():
 
     # 5. Persist to MongoDB
     if db and not args.dry_run:
-        logger.info("Persisting datasets to MongoDB...")
+        logger.info("Persisting datasets...")
         m_count = db.upsert_mandi_records(mandi_records)
         p_count = db.upsert_plants_records(plant_records)
         s_count = db.upsert_seeds_records(seed_records)

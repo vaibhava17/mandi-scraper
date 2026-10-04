@@ -108,6 +108,22 @@ docker compose up -d mongo
 docker compose run --rm scraper
 ```
 
+### Option C: MySQL instead of MongoDB
+
+Set `DATABASE_URL` and the scraper writes to MySQL (8.0+) instead of MongoDB. Nothing else changes.
+
+```bash
+mysql -u <user> -p <db> < sql/mysql-schema.sql      # idempotent, safe to re-run
+export DATABASE_URL="mysql://<user>:<password>@127.0.0.1:3306/<db>"
+python src/main.py
+```
+
+- Rows are upserted on their natural key (market + commodity + variety + date for mandi prices, name/title + vendor + date for plants and seeds), so re-running a day updates prices instead of duplicating them.
+- Each row keeps a 24-hex `mongo_id`, so data from both backends can be merged into the same tables.
+- The run exits with code 1 if the tables are missing (it never creates or alters schema itself).
+- The Docker image runs as a non-root user and works with a read-only root filesystem:
+  `docker run --rm --network host --read-only -e DATABASE_URL mandi-scraper`
+
 ---
 
 ## ⏰ Automated Daily Run (Cron)

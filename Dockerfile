@@ -5,14 +5,12 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && useradd --system --uid 10010 --no-create-home scraper
 
-COPY . .
+COPY src ./src
+COPY sql ./sql
 
+USER scraper
 CMD ["python", "src/main.py"]
